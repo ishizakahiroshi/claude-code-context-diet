@@ -25,7 +25,7 @@ Claude Code の常駐 context を実測ベースで減らすための手順集�
 
 ## 関連記事
 
-- 詳しい背景と Before/After 数値: [Zenn 記事「Claude Code の常駐 context を 14% 削った話。disabledTools は存在しなかった」](https://zenn.dev/ishizakahiroshi/articles/claude-code-context-diet)
+- 詳しい背景と Before/After 数値: [Zenn 記事「Claude Code の常駐 context を 14% 削った話。disabledTools は存在しなかった」](https://zenn.dev/ishizakahiroshi/articles/20260622-claude-code-context-diet)
 - 図解版・詳細版: [ishizakahiroshi.github.io/articles/2026-06-22-claude-code-context-diet/](https://ishizakahiroshi.github.io/articles/2026-06-22-claude-code-context-diet/)
 
 ## 注意
