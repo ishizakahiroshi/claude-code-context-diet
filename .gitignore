@@ -1,0 +1,21 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*~
+
+# Node / build artifacts (preventive)
+node_modules/
+dist/
+build/
+*.log
+
+# Local notes
+*.local.md
+*.local.json
+.env
+.env.*
