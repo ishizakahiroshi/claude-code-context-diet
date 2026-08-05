@@ -110,7 +110,7 @@ CLAUDE.md からは **3〜5 行のトリガー文だけ残す**:
 
 ```markdown
 ## コーディング規範（コードに触る前に Read）
-ファイルを編集・新規作成する前に必ず `C:\Users\<user>\.claude\guides\rule_coding-stance.md` を Read。
+ファイルを編集・新規作成する前に必ず `~/.claude/guides/rule_coding-stance.md` を Read。
 トリガー: Edit / Write / NotebookEdit ツールを使う前、または「実装して」「直して」依頼を受けた時。
 ```
 
