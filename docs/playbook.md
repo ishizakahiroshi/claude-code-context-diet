@@ -48,6 +48,8 @@ Memory files · /memory
 
 **Memory が 15k tokens を超えていれば削減候補**。10k 以下ならほぼ何もできない（誤差レベル）。
 
+**絶対値だけでなく Total 行の context window 上限も見る。** `/context` の 1 行目に出るモデル名・トークン上限（例: `343.1k/967k tokens (35%)`）を確認する。200k トークン級の環境では Memory files 数万トークンの削減が Total の数%〜十数%に効くが、`[1m]` サフィックス付きモデルなど 1M トークン級の環境では、同じ削減幅でも Total に対しては 1% 未満のことがある（2026-08-18 実測: Memory files -9.9k / -22.7% だが Total 967k〜1M に対しては 1% 未満）。**上限が大きい環境ほど、削減の絶対量だけで「効果があった」と判断しない。**
+
 ## Step 2: CLAUDE.md の章を 3 分類
 
 `~/.claude/CLAUDE.md` を全部読み、章ごとに分類する。
@@ -115,6 +117,10 @@ CLAUDE.md からは **3〜5 行のトリガー文だけ残す**:
 ```
 
 ## Step 4: `settings.json` のチューニング
+
+### 着手前に: context window の規模を見る
+
+`settings.json` のキーは機能を犠牲にしてトークンを削る（`disableWorkflows` なら Workflow ツール・ultracode ごと消える）。**削減量（数百〜1 万トークン程度）が Total に対してどれだけの割合か、Step 1 で確認した数字と照らしてから判断する。** 1M トークン級の環境では、最大効果とされる `disableWorkflows` ですら Total に対して 1% 未満のことがあり、失う機能とのトレードオフが見合わないことが多い。すでに `enableWorkflows: true` 等で Workflow を能動的に使っている設定が入っている場合は、そもそも変更候補から外れる。
 
 ### やってはいけないこと
 

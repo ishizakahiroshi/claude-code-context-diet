@@ -33,6 +33,7 @@ Claude Code の常駐 context を実測ベースで減らすための手順集�
 - 環境依存度がそこそこ高いです。すでにスリムな人はほぼ変化なし
 - `disableWorkflows: true` を入れるとローカル Workflow ツール（ultracode モードや一部 skill）が使えなくなる。1 行戻せば即復活
 - `~/.claude/CLAUDE.md` を編集する前に **必ずバックアップ**（`*.bak.YYYY-MM-DD` 推奨）
+- **1M token 対応モデル（`[1m]` サフィックス付き）を使っている場合、削減効果は相対的に小さくなります。** 2026-08-18 の別環境での実測では、CLAUDE.md 分割で Memory files を -22.7%（-9.9k tokens）削減できましたが、Total（967k〜1M tokens）に対しては 1% 未満の差でした。まず `/context` の Total 行で context window の規模を確認し、削る価値があるか判断してください（詳細: [`docs/playbook.md`](docs/playbook.md) Step 1）
 
 ## ライセンス
 

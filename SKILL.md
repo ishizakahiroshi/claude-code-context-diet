@@ -20,7 +20,7 @@ Claude Code セッションの常駐 context を実測ベースで減らす。`/
 
 ### Step 1: 現状把握
 
-ユーザーに `/context` を実行してもらい、結果（Total / System prompt / System tools / Memory files / Skills の内訳）を貼ってもらう。
+ユーザーに `/context` を実行してもらい、結果（Total / System prompt / System tools / Memory files / Skills の内訳）を貼ってもらう。**Total 行のモデル名・トークン上限も必ず見る。** `[1m]` サフィックス付きモデルなど 1M トークン級の環境では、Memory files が数万トークンあっても Total に対しては 1% 前後のことがあり、削減の優先度判断が変わる（2026-08-18 実測: Memory files -22.7% でも Total 比では 1% 未満）。
 
 ### Step 2: Memory files の棚卸し
 
@@ -50,6 +50,9 @@ Claude Code セッションの常駐 context を実測ベースで減らす。`/
 - Workflow / ultracode 使う → `disableWorkflows` は入れない
 - bundled skill 多用 → `disableBundledSkills` は入れない
 - git 操作が中心 → `includeGitInstructions: false` は入れない
+- 既に `enableWorkflows: true` 等で能動利用が明示されている設定があれば、そもそも変更候補から外す
+
+**提案前に Step 1 で見た Total 行の上限も踏まえる。** 1M トークン級の環境では `disableWorkflows` の削減量（5〜10k tokens）ですら Total の 1% 未満のことがあり、失う機能に対して割に合わないことがある。その場合は「今は変更しない」を選択肢として案内し、強い設定を既定の推奨にしない。
 
 最小リスク 2 行（`disableArtifact: true` + `disableWorkflows: true`）から始めて、新セッションで `/context` を再測。
 
