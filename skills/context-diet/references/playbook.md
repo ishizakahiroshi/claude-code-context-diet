@@ -46,7 +46,13 @@ Memory files · /memory
 └ ...
 ```
 
+展開表示が欲しい場合は `/context all` を使う。skill ごとの listing cost・直近 7 日間の使用回数・一度も呼ばれていない skill の一覧を見るには `/skill-doctor` を使う。
+
+`/context` で "deferred" と表示される MCP ツールは、Tool Search によりスキーマが遅延ロードされていて常駐していないので、削減対象にしない。
+
 **Memory が 15k tokens を超えていれば削減候補**。10k 以下ならほぼ何もできない（誤差レベル）。
+
+公式 docs も CLAUDE.md 単体の行数に目安を示している（<https://code.claude.com/docs/en/memory> より、2026-09-06 fetch）: "Size: target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence."（CLAUDE.md 1 ファイルあたり 200 行未満を目安にする。長いファイルは context を消費し遵守率も下がる、の意）。トークン数の目安（本 Step の 15k tokens）とは測る単位が違うので、どちらか一方だけでなく両方で確認する。
 
 **絶対値だけでなく Total 行の context window 上限も見る。** `/context` の 1 行目に出るモデル名・トークン上限（例: `343.1k/967k tokens (35%)`）を確認する。200k トークン級の環境では Memory files 数万トークンの削減が Total の数%〜十数%に効くが、`[1m]` サフィックス付きモデルなど 1M トークン級の環境では、同じ削減幅でも Total に対しては 1% 未満のことがある（2026-08-18 実測: Memory files -9.9k / -22.7% だが Total 967k〜1M に対しては 1% 未満）。**上限が大きい環境ほど、削減の絶対量だけで「効果があった」と判断しない。**
 
@@ -116,15 +122,37 @@ CLAUDE.md からは **3〜5 行のトリガー文だけ残す**:
 トリガー: Edit / Write / NotebookEdit ツールを使う前、または「実装して」「直して」依頼を受けた時。
 ```
 
+### 公式代替: `.claude/rules/`（プロジェクト階層の条件付き読込）
+
+上記はユーザー（AI）に「読め」と指示する手動の遅延読込だが、Claude Code にはプロジェクト階層向けの公式機構 `.claude/rules/*.md` がある。frontmatter に `paths:` を書くと、パターンに一致するファイルを Claude が開いたときだけそのルールが読み込まれる。`paths:` を書かなければ CLAUDE.md と同様に起動時読込になる（公式 docs memory.md による）:
+
+```markdown
+---
+paths:
+  - "src/api/**/*.ts"
+---
+
+# API 開発ルール
+
+- すべての API エンドポイントは入力検証を必須にする
+```
+
+役割分担:
+
+- ユーザー階層（`~/.claude/CLAUDE.md`）: 本 Step 2〜3 のサブファイル化 + トリガー文方式
+- プロジェクト階層で特定ファイル種別にだけ効かせたいルール: `.claude/rules/` の `paths:` 条件付き読込
+
+ユーザー階層向けの `~/.claude/rules/` も公式 docs（memory.md の「User-level rules」節）に記載がある。プロジェクトの rules より先に読み込まれる。
+
 ## Step 4: `settings.json` のチューニング
 
 ### 着手前に: context window の規模を見る
 
-`settings.json` のキーは機能を犠牲にしてトークンを削る（`disableWorkflows` なら Workflow ツール・ultracode ごと消える）。**削減量（数百〜1 万トークン程度）が Total に対してどれだけの割合か、Step 1 で確認した数字と照らしてから判断する。** 1M トークン級の環境では、最大効果とされる `disableWorkflows` ですら Total に対して 1% 未満のことがあり、失う機能とのトレードオフが見合わないことが多い。すでに `enableWorkflows: true` 等で Workflow を能動的に使っている設定が入っている場合は、そもそも変更候補から外れる。
+`settings.json` のキーは機能を犠牲にしてトークンを削る（`enableWorkflows: false` なら Workflow ツール・ultracode ごと消える）。**削減量（数百〜1 万トークン程度）が Total に対してどれだけの割合か、Step 1 で確認した数字と照らしてから判断する。** 1M トークン級の環境では、最大効果とされる `enableWorkflows: false` ですら Total に対して 1% 未満のことがあり、失う機能とのトレードオフが見合わないことが多い。すでに `enableWorkflows: true` 等で Workflow を能動的に使っている設定が入っている場合は、そもそも変更候補から外れる。
 
 ### やってはいけないこと
 
-❌ `disabledTools` キーを追加 — **公式に存在しない**。書いても無視される
+❌ `disabledTools` キーを追加 — **公式に存在しない（Claude Code 2.1.263 で確認）**。書いても無視される
 
 ❌ `permissions.deny` を「context 削減のため」追加 — 呼び出しブロックのみで context は減らない
 
@@ -132,19 +160,21 @@ CLAUDE.md からは **3〜5 行のトリガー文だけ残す**:
 
 ```json
 {
-  "disableArtifact": true,
-  "disableWorkflows": true
+  "enableArtifact": false,
+  "enableWorkflows": false
 }
 ```
 
-完全な公式キー一覧は [settings-keys-reference.md](settings-keys-reference.md) 参照。
+旧キー `disableArtifact: true` / `disableWorkflows: true` も引き続き動作するが、新規に書くときは `enableArtifact` / `enableWorkflows` を使う。完全な公式キー一覧は [settings-keys-reference.md](settings-keys-reference.md) 参照。
 
-`disableWorkflows` のリスク:
+`enableWorkflows: false` のリスク:
 - ローカル Workflow ツール（多 agent オーケストレーション）が使えなくなる
 - ultracode モード（Claude Code の workflow ベース機能）が動かなくなる
 - 一部 skill（deep-research 等の workflow 依存）が消える
 
-→ Workflow を能動的に使っていなければ入れて良い。必要になったら 1 行削除で即復活。
+→ Workflow を能動的に使っていなければ入れて良い。必要になったら該当行を削除して再起動で即復活。
+
+滅多に使わない skill が個別にある場合は、一括封印の `disableBundledSkills` の代わりに `skillOverrides` で対象を絞る方法もある（値: `on` / `name-only` / `user-invocable-only` / `off`。詳細は [settings-keys-reference.md](settings-keys-reference.md) 参照）。
 
 ### Hub 系の条件付きロード
 
@@ -182,7 +212,7 @@ Before/After 比較表を作る:
 ## Step 6: しばらく様子見
 
 - 2 週間ほど運用して挙動に問題なければバックアップ削除
-- Workflow / ultracode / deep-research が必要になったら `disableWorkflows` を消す
+- Workflow / ultracode / deep-research が必要になったら `enableWorkflows: false`（旧 `disableWorkflows: true` も可）の行を削除する
 - トリガー判定漏れの事故があれば、該当トリガー文を grep 可能な明示語彙に書き直す
 
 ## トラブルシュート
@@ -193,11 +223,11 @@ Before/After 比較表を作る:
 
 ### 「context が思ったほど減らない」
 
-→ Memory が元々スリムだった可能性大。System tools 側で `disableWorkflows` を試す。
+→ Memory が元々スリムだった可能性大。System tools 側で `enableWorkflows: false`（旧 `disableWorkflows: true` も可）を試す。
 
-### 「`disableWorkflows` 入れたら ultracode が動かない」
+### 「`enableWorkflows: false` 入れたら ultracode が動かない」
 
-→ 想定通り。`settings.json` の `"disableWorkflows": true` を削除して再起動。
+→ 想定通り。`settings.json` の `"enableWorkflows": false`（または旧キー `"disableWorkflows": true`）の行を削除して再起動。
 
 ### 「`/context` の数値が変わらない」
 

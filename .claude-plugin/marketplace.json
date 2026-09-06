@@ -1,0 +1,14 @@
+{
+  "name": "ishizakahiroshi",
+  "owner": { "name": "ishizakahiroshi" },
+  "metadata": {
+    "description": "ishizakahiroshi の Claude Code plugin 置き場（現在は context-diet のみ）"
+  },
+  "plugins": [
+    {
+      "name": "context-diet",
+      "source": "./",
+      "description": "Claude Code の常駐 context を /context の実測ベースで棚卸し・削減する手順スキル"
+    }
+  ]
+}

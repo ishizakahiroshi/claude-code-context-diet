@@ -1,0 +1,10 @@
+{
+  "name": "context-diet",
+  "description": "Claude Code の常駐 context を /context の実測ベースで棚卸し・削減する手順スキル",
+  "version": "1.0.0",
+  "author": { "name": "ishizakahiroshi", "url": "https://github.com/ishizakahiroshi" },
+  "homepage": "https://github.com/ishizakahiroshi/claude-code-context-diet",
+  "repository": "https://github.com/ishizakahiroshi/claude-code-context-diet",
+  "license": "MIT",
+  "keywords": ["claude-code", "context", "settings", "skill"]
+}

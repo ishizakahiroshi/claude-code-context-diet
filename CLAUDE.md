@@ -11,20 +11,26 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 削る作業を再現可能にしたもの。元になった検証では総量を 80.7k → 69.5k tokens
 （-11.2k / -13.9%）まで減らした。
 
-コードを持たないドキュメント／スキル配布リポジトリ。利用者は `SKILL.md` を
-`~/.claude/skills/context-diet/SKILL.md` として配置して使う。
+コードを持たないドキュメント／スキル配布リポジトリ。利用者は plugin として
+（`/plugin install context-diet@ishizakahiroshi`）、または `skills/context-diet/` を
+`~/.claude/skills/context-diet/` へディレクトリごとコピーして使う。
 
-## このリポジトリの `SKILL.md` について（重要）
+## このリポジトリの `skills/context-diet/SKILL.md` について（重要）
 
-**ルートの `SKILL.md` は配布物であって、このリポジトリの開発ルールではない。**
-利用者の環境へコピーされて動く Claude Code スキルの実体なので、次を守る:
+**`skills/context-diet/SKILL.md` と `references/` は配布物であって、このリポジトリの
+開発ルールではない。** 利用者の環境へコピーされて動く Claude Code スキルの実体なので、
+次を守る:
 
 - 作者環境固有の絶対パス・個人情報・kb 由来の固有名詞を書かない。**第三者の環境で
   そのまま動く**ことが成立条件
 - frontmatter の `name` / `description` は起動語の正本。変更すると利用者の発火条件が
   変わるので、README の説明と必ず同時に更新する
+- `SKILL.md` からのリンクは `references/…` の相対パスにする（配置先でも切れない形）
+- `.claude-plugin/plugin.json` / `.claude-plugin/marketplace.json` も配布物。**スキルを
+  変更したら `plugin.json` の `version` を上げる。** 利用者へ更新が届くのは version が
+  上がったときだけ
 - 本ファイル（`CLAUDE.md`）と混同しない。`CLAUDE.md` は**このリポジトリを開発する
-  AI 向け**、`SKILL.md` は**利用者の環境で動く配布物**
+  AI 向け**、`skills/context-diet/SKILL.md` は**利用者の環境で動く配布物**
 
 ## やらないこと（スコープ外）
 
@@ -41,15 +47,18 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 | レイヤ | 採用 |
 |---|---|
 | 実体 | Markdown のみ（ビルド・実行系なし） |
-| 配布 | GitHub（clone または raw URL で `SKILL.md` を取得） |
+| 配布 | Claude Code plugin（`.claude-plugin/` の manifest 経由）／`skills/context-diet/` のディレクトリコピー |
 | ライセンス | MIT |
 
 ## ディレクトリ構成
 
-- `SKILL.md` — 配布用スキル本体（利用者が `~/.claude/skills/context-diet/` へ置く）
-- `docs/playbook.md` — 詳細手順
-- `docs/settings-keys-reference.md` — `settings.json` で実在する context 削減キーの一覧
-- `examples/claude-md-split-pattern.md` — CLAUDE.md を分割する具体パターン
+- `skills/context-diet/SKILL.md` — 配布用スキル本体（plugin として自動検出される。手動なら
+  ディレクトリごと `~/.claude/skills/context-diet/` へ置く）
+- `skills/context-diet/references/playbook.md` — 詳細手順
+- `skills/context-diet/references/settings-keys-reference.md` — `settings.json` で実在する context 削減キーの一覧
+- `skills/context-diet/references/claude-md-split-pattern.md` — CLAUDE.md を分割する具体パターン
+- `.claude-plugin/plugin.json` — plugin manifest（`skills/` は自動検出なので列挙しない）
+- `.claude-plugin/marketplace.json` — marketplace manifest（このリポ自身を `"./"` として配る）
 - `scripts/` — secrets-scan と hook インストーラ
 - `.githooks/` — layer 2 pre-commit
 - `.github/workflows/` — layer 3 CI
@@ -59,6 +68,8 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 ビルドもテストもない。編集して push するだけ。
 
 - secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
+- manifest 検証: `claude plugin validate .`（marketplace 側）/ `claude plugin validate .claude-plugin/plugin.json`（plugin 側）。CI 相当の厳しさで見るときは `--strict`
+- ローカル起動テスト: `claude --plugin-dir .`（この状態のリポを plugin として読み込んだセッションが立つ）
 
 ## AI 作業共通ルール
 
@@ -69,8 +80,11 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 - **数値を書き換えるときは出典を確認する。** README と記事に出ている
   「80.7k → 69.5k / -13.9%」は実測値。別の環境の数字で上書きしない
 - **「`disabledTools` は存在しない」のような否定形の事実は、確認した Claude Code の版と
-  セットで書く。** 版が上がって実在するようになったら、その時点で訂正が要る
-- `SKILL.md` を変更したら README の説明表も同時に直す（起動語と用途が 2 箇所にある）
+  セットで書く。** 版が上がって実在するようになったら、その時点で訂正が要る。2026-06-22 版は
+  `skillOverrides` を「存在しない」と書いていたが、2.1.263 の実行ファイル走査で実在が確認され
+  訂正した（このリポ自身が踏んだ例）
+- `SKILL.md` を変更したら README の説明表も同時に直す（起動語と用途が 2 箇所にある）。
+  あわせて `.claude-plugin/plugin.json` の `version` を上げる（上げないと利用者へ更新が届かない）
 
 ## secrets-scan（このリポジトリの配線）
 
@@ -90,7 +104,8 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 | 項目 | パス |
 |---|---|
 | ユーザー向け README | `README.md` |
-| 配布用スキル本体 | `SKILL.md` |
-| 詳細手順 | `docs/playbook.md` |
+| 配布用スキル本体 | `skills/context-diet/SKILL.md` |
+| 詳細手順 | `skills/context-diet/references/playbook.md` |
+| plugin / marketplace manifest | `.claude-plugin/plugin.json` / `.claude-plugin/marketplace.json` |
 | Codex/他 AI 用入口 | `AGENTS.md` |
 | 背景記事（Zenn） | https://zenn.dev/ishizakahiroshi/articles/20260622-claude-code-context-diet |
