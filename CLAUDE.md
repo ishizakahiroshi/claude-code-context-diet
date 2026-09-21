@@ -9,7 +9,9 @@ fresh public clone でも有効な内容に保つこと。 -->
 Claude Code の常駐 context を実測ベースで減らすための**手順集と配布用スキル**。
 「`/context` を開いたら、何もしていないのに 80k tokens 食っていた」という状態から
 削る作業を再現可能にしたもの。元になった検証では総量を 80.7k → 69.5k tokens
-（-11.2k / -13.9%）まで減らした。
+（-11.2k / -13.9%）まで減らした。2026-09-21 に Claude Code 2.1.278 で再測し、目的を
+「削る価値の判定 → 指示の遵守率と cache miss 時の再処理量」へ置き直した（1M 窓が既定の環境では
+settings キーの最大でも -3,563 tokens。測定条件は `skills/context-diet/references/settings-keys-reference.md`）。
 
 コードを持たないドキュメント／スキル配布リポジトリ。利用者は plugin として
 （`/plugin install context-diet@ishizakahiroshi`）、または `skills/context-diet/` を
@@ -54,9 +56,9 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 
 - `skills/context-diet/SKILL.md` — 配布用スキル本体（plugin として自動検出される。手動なら
   ディレクトリごと `~/.claude/skills/context-diet/` へ置く）
-- `skills/context-diet/references/playbook.md` — 詳細手順
-- `skills/context-diet/references/settings-keys-reference.md` — `settings.json` で実在する context 削減キーの一覧
-- `skills/context-diet/references/claude-md-split-pattern.md` — CLAUDE.md を分割する具体パターン
+- `skills/context-diet/references/playbook.md` — 詳細手順（判定 3 分岐・内容の監査 4 観点・skill の作り方・使用実績の数え方・API usage での実測法）
+- `skills/context-diet/references/settings-keys-reference.md` — `settings.json` で実在する context 削減キーの一覧と 2.1.278 の API 実測
+- `skills/context-diet/references/claude-md-split-pattern.md` — CLAUDE.md の章を skill / rules / トリガー文へ移す具体パターン
 - `.claude-plugin/plugin.json` — plugin manifest（`skills/` は自動検出なので列挙しない）
 - `.claude-plugin/marketplace.json` — marketplace manifest（このリポ自身を `"./"` として配る）
 - `scripts/` — secrets-scan と hook インストーラ
@@ -70,6 +72,7 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
 - secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
 - manifest 検証: `claude plugin validate .`（marketplace 側）/ `claude plugin validate .claude-plugin/plugin.json`（plugin 側）。CI 相当の厳しさで見るときは `--strict`
 - ローカル起動テスト: `claude --plugin-dir .`（この状態のリポを plugin として読み込んだセッションが立つ）
+- 削減量の実測: `claude -p "Reply with exactly: OK" --output-format json --settings <json>` の `usage`（`input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens`）。`/context` は推定で、同条件の API 実測と 14.6k tokens ずれた（2.1.278）
 
 ## AI 作業共通ルール
 
@@ -85,6 +88,12 @@ Claude Code の常駐 context を実測ベースで減らすための**手順集
   訂正した（このリポ自身が踏んだ例）
 - `SKILL.md` を変更したら README の説明表も同時に直す（起動語と用途が 2 箇所にある）。
   あわせて `.claude-plugin/plugin.json` の `version` を上げる（上げないと利用者へ更新が届かない）
+- **数字はどちらで測ったかを併記する。** `/context` の値は推定、API usage が実測。2.1.278 では同条件で
+  14.6k tokens ずれ、カテゴリ配分も一致しなかった（`skillListingMaxDescChars: 256` で推定は Total 不変、
+  API は -2,277）
+- **削減キーが逆に増やす例がある。** 2.1.278 で `disableBundledSkills: true` は単独で +4,679 tokens だった。
+  キーを勧める前に必ず実測する。非対話（`-p`）には Artifact / AskUserQuestion / MCP が載らないので、それらの
+  効果は対話セッションで取る
 
 ## secrets-scan（このリポジトリの配線）
 

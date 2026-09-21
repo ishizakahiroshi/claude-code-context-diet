@@ -8,7 +8,7 @@
     {
       "name": "context-diet",
       "source": "./",
-      "description": "Claude Code の常駐 context を /context の実測ベースで棚卸し・削減する手順スキル"
+      "description": "Claude Code の常駐 context を /context と API 実測で棚卸しし、内容を 4 観点（矛盾・重複・陳腐化・曖昧）で監査してから、削る価値を判定して減らす手順スキル"
     }
   ]
 }
