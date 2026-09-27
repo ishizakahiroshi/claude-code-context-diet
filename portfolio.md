@@ -1,4 +1,11 @@
 ---
+cover:
+  path: portfolio/overview-2026-09-28.jpg
+  alt: {ja: "claude-code-context-diet の紹介動画", en: "claude-code-context-diet overview video"}
+video:
+  provider: youtube
+  id: "iBDMiqXBuXY"
+  durationSeconds: 20
 schemaVersion: 1
 color: "#b0785a"
 initials: "cc"
