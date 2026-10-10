@@ -6,10 +6,12 @@ Claude Code の常駐 context を実測ベースで棚卸しし、削る価値�
 
 2026-09-21 に Claude Code 2.1.278 で再測し、目的を置き直しました。Anthropic API 直結では現行モデルが 1M 窓を既定で使うため、同じ常駐 80k でも Total の 8% にしかならず、`settings.json` のキーで削れるのは最大でも約 3.6k tokens（`disableBundledSkills: true` + `enableWorkflows: false` で -3,563。Total の 0.4%）でした。削る理由は「トークン量」から「指示の遵守率」と「prompt cache が外れたときの再処理量」へ移ります。
 
+2026-10-10 に Claude Code 2.1.295 の CHANGELOG・公式 docs と照合し、変わった記述（200k 窓が残る条件・`/context` の MCP 行・`disableWorkflows` の扱い等）を直して、公式の `/doctor prompt-audit` を手順に入れました（plugin 1.2.0）。削減量の実測値は 2.1.278 のままです。
+
 ## まず判断すること
 
 1. `/context` の Total 行の分母を見る。1M 窓ならトークン目的では削らず、目的を遵守率と cache miss 時の再処理量に置く
-2. 行数を減らす前に、内容を 4 観点（矛盾・重複・陳腐化・曖昧）で監査する。CLAUDE.md・`@import`・memory・ツールが注入するファイルの間の矛盾は、トークンを減らしても残る
+2. 行数を減らす前に、内容を 4 観点（矛盾・重複・陳腐化・曖昧）で監査する。CLAUDE.md・`@import`・memory・ツールが注入するファイルの間の矛盾は、トークンを減らしても残る。Claude Code 2.1.283 以降は公式の `/doctor prompt-audit` を先に回す（陳腐化と矛盾を修正案つきで出す。重複と曖昧は 4 観点の表で見る）
 3. CLAUDE.md が 1 ファイル 200 行を超えていれば、公式の目安どおり skills / `.claude/rules/` へ移す（`@import` に分けても context は減らない）
 4. `settings.json` のキーは最後。`disableBundledSkills: true` は単独で常駐が増える（2.1.278 実測 +4,679 tokens）ので入れない
 5. Skills と System tools は使用実績で切る。`/skill-doctor` だけで判断せず、transcript の tool_use を 60 日ぶん数える。設定はどの settings.json が読まれているか（`CLAUDE_CONFIG_DIR`）を先に確かめる
@@ -55,7 +57,7 @@ Claude Code を再起動すると使えます。AI に「コンテキスト棚�
 
 ## 関連記事
 
-どちらも 2026-06-22 時点（200k 窓・旧キー名 `disableArtifact` / `disableWorkflows` の時代）の記述です。現行の判定基準は [`skills/context-diet/references/playbook.md`](skills/context-diet/references/playbook.md) Step 1、現行のキー名と 2.1.278 の実測値は [`skills/context-diet/references/settings-keys-reference.md`](skills/context-diet/references/settings-keys-reference.md) を参照してください。
+どちらも 2026-06-22 時点（200k 窓・キーを `disableArtifact` / `disableWorkflows` で書いていた時期）の記述です。現行の判定基準は [`skills/context-diet/references/playbook.md`](skills/context-diet/references/playbook.md) Step 1、現行のキー名と 2.1.278 の実測値は [`skills/context-diet/references/settings-keys-reference.md`](skills/context-diet/references/settings-keys-reference.md) を参照してください。
 
 - 詳しい背景と Before/After 数値: [Zenn 記事「Claude Code の常駐 context を 14% 削った話。disabledTools は存在しなかった」](https://zenn.dev/ishizakahiroshi/articles/20260622-claude-code-context-diet)
 - 図解版・詳細版: [ishizakahiroshi.github.io/articles/2026-06-22-claude-code-context-diet/](https://ishizakahiroshi.github.io/articles/2026-06-22-claude-code-context-diet/)
@@ -63,11 +65,11 @@ Claude Code を再起動すると使えます。AI に「コンテキスト棚�
 ## 注意
 
 - 環境依存度がそこそこ高いです。すでにスリムな人はほぼ変化なし
-- `enableWorkflows: false`（旧キー `disableWorkflows: true` も引き続き有効）を入れるとローカル Workflow ツール（ultracode モードや一部 skill）が使えなくなる。1 行戻せば即復活。2.1.278 の API 実測（非対話・検証環境）で -2,057 tokens
+- `enableWorkflows: false` を入れるとローカル Workflow ツール（ultracode モードや一部 skill）が使えなくなる（`disableWorkflows: true` でも止まるが、こちらは managed settings 等で全員に効かせるためのキー。2.1.285 から Code Review と `/ultrareview` は止めない）。1 行戻せば即復活。2.1.278 の API 実測（非対話・検証環境）で -2,057 tokens
 - `disableBundledSkills: true` は単独では常駐が増える（2.1.278 実測 +4,679 tokens）。`enableWorkflows: false` と併用したときだけ -3,563 で、その場合 `/loop` `/schedule` 等の bundled skill も消える
 - skill 単位で常駐 listing を削る `skillOverrides`（`name-only` / `user-invocable-only` / `off`）が Claude Code 2.1.278 で実在することを確認済み。作者環境では 60 日間未使用の 31 本に当てて Skills の推定 8.6k → 3.4k、コネクタ off・autoMemory off と合わせて API 実測 −6,250 tokens、対話の `/context` 推定では Artifact off も含めて Total 56.7k → 45k（2026-09-21）。詳細は [`skills/context-diet/references/settings-keys-reference.md`](skills/context-diet/references/settings-keys-reference.md)
 - `~/.claude/CLAUDE.md` を編集する前に **必ずバックアップ**（`*.bak.YYYY-MM-DD` 推奨）
-- **1M 窓が既定の環境では、削減効果は Total に対して 1% 未満です。** 公式 model-config（2026-09-21 fetch）: "On the Anthropic API, Fable 5.1, Fable 5, Sonnet 5, and Opus 4.7 and later run with the 1M window by default."。200k 窓が残るのは Pro プランで usage credits を使わない Opus と、Bedrock / Vertex / Foundry で `[1m]` を付けずにピン留めしたモデルです。2026-08-18 の実測では、CLAUDE.md 分割で Memory files を -22.7%（-9.9k tokens）削減できましたが、Total（967k〜1M tokens）に対しては 1% 未満の差でした。まず `/context` の Total 行で分母を確認し、削る価値があるか判断してください（詳細: [`skills/context-diet/references/playbook.md`](skills/context-diet/references/playbook.md) Step 1）
+- **1M 窓が既定の環境では、削減効果は Total に対して 1% 未満です。** 公式 model-config（2026-10-10 fetch）: "Fable 5.1, Fable 5, Sonnet 5 and later, Haiku 5.5, and Opus 4.7 and later run with the 1M window by default, with no `[1m]` suffix needed. That includes sessions on Amazon Bedrock, Google Cloud's Agent Platform, and Microsoft Foundry, and Claude apps gateway sessions."。Bedrock / Vertex / Foundry も 2.1.287 から既定で 1M です。200k 窓が残るのは、Opus 4.6 / Sonnet 4.6 を `[1m]` なしで使う場合、1M に対応しないモデル、`CLAUDE_CODE_DISABLE_1M_CONTEXT=1` を設定した場合です。2026-08-18 の実測では、CLAUDE.md 分割で Memory files を -22.7%（-9.9k tokens）削減できましたが、Total（967k〜1M tokens）に対しては 1% 未満の差でした。まず `/context` の Total 行で分母を確認し、削る価値があるか判断してください（詳細: [`skills/context-diet/references/playbook.md`](skills/context-diet/references/playbook.md) Step 1）
 
 ## ライセンス
 

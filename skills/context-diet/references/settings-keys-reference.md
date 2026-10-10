@@ -1,9 +1,10 @@
 # settings.json 公式キー リファレンス（Context 削減目的）
 
 確認版: Claude Code 2.1.278（2026-09-21、実行ファイルの文字列走査 + 公式 docs 照合 + `claude -p` の API usage 実測）。前回の確認は 2.1.263（2026-09-06）。
+2026-10-10 に 2.1.295 で再照合した（CHANGELOG 2.1.280〜2.1.295・公式 docs・実行ファイルの文字列）。変わっていた記述だけを直し、直した箇所には 2.1.295 または該当版を書いた。削減量の API 実測は 2.1.278 のまま取り直していない。
 
 Claude Code の `settings.json` で context 削減に関係する公式キーの完全リファレンス。
-公式 docs（<https://code.claude.com/docs/en/settings>）の記載と、Claude Code 2.1.278 実行ファイルの
+公式 docs（<https://code.claude.com/docs/en/settings-reference>。キーごとの定義はこちら。<https://code.claude.com/docs/en/settings> は設定ファイルの仕組みの説明）の記載と、Claude Code 2.1.278 実行ファイルの
 文字列走査（zod スキーマの `describe()` 文字列を含む）を突き合わせ、削減量は API usage の実測（下記「測定条件」）で取った。
 describe() 引用は実行ファイルで確認できたもの（binary 確認）。binary で確認できず docs のみで
 裏取りした事実は個別に「公式 docs による」と注記する。
@@ -55,7 +56,7 @@ listing 制御は `skillOverrides` として実在する**（下記「実在キ�
 | `enableArtifact: false` | Artifact ツール定義を context から削除（claude.ai へセッション出力を公開する機能） | 対話の `/context` 推定: `disableClaudeAiConnectors: true` と同時に入れて System tools 19.4k → 14.6k（-4.8k・未分離・2026-09-21 作者環境）。非対話では測れない（説明文は 6,512 文字） | Artifact 未使用なら無リスク |
 | `skillListingBudgetFraction`（既定 0.01） | skill listing 全体の文字数予算を context window に対する割合で指定。超過分は各 skill の description が自動的に短縮される | 未実測 | 下げすぎると全 skill の description がほぼ消える |
 | `skillOverrides` | skill ごとに listing 表示を制御する（下記「使用例」） | 選び方次第。作者環境で 60 日未使用の 31 本（off 20・name-only 11）に当て、コネクタ off・autoMemory off と合わせて -6,250 tokens（2026-09-21。`/context` 推定では Skills 8.6k → 3.4k） | 誤って `off` にした skill が呼べなくなる |
-| `disableClaudeAiConnectors: true` | claude.ai の MCP コネクタを取りに行かない（名前と server instructions の常駐が消える） | 未分離（上記の -6,250 に含む） | claude.ai 側で設定したコネクタが使えなくなる |
+| `disableClaudeAiConnectors: true` | claude.ai の MCP コネクタを取りに行かない（名前と server instructions の常駐が消える） | 未分離（上記の -6,250 に含む）。対話の `/context` なら 2.1.283 以降は "MCP server instructions" 行の差で推定できる | claude.ai 側で設定したコネクタが使えなくなる |
 | `claudeMdExcludes: ["pattern1", "pattern2"]` | 特定の CLAUDE.md を loading 対象から除外（User / Project / Local の CLAUDE.md に適用） | 環境次第（未実測） | 必要な CLAUDE.md を誤って除外する事故。managed / policy の CLAUDE.md は除外できない |
 | `disableAllHooks: true` | hooks と statusLine の実行を停止する | 未実測（hook の出力量に依存） | hooks に依存した自動化・ガードが止まる |
 
@@ -76,17 +77,26 @@ Artifact ツールは対話セッション限定で、非対話（`-p`）には�
 share the page." まで）は 6,512 文字で、2026-06-22 版の「< 500 tokens」の推定はもう当てはまらない。効果は対話セッションで
 `/context` の Before / After（推定値）を取って判断する。
 
-### `enableWorkflows` / 旧キー `disableWorkflows`
+### `enableWorkflows` / `disableWorkflows`
 
-`enableWorkflows` の describe() 文字列（binary 確認）: `"Enable or disable the Workflows feature for this
+`enableWorkflows` の describe() 文字列（binary 確認・2.1.295 でも同じ）: `"Enable or disable the Workflows feature for this
 user. Unset = default by plan once the feature is available."`
 
-`disableWorkflows` の describe() 文字列（binary 確認）: `"Disable the Workflows feature (also via
-CLAUDE_CODE_DISABLE_WORKFLOWS)."`
+`disableWorkflows` の describe() 文字列（binary 確認・2.1.295）: `"Disable the Workflows feature. Code Review on pull
+requests and /ultrareview run in Anthropic's cloud and are not stopped by this setting, except an /ultrareview that has
+to restart partway through. …"`（以下、レビューを実行するマシン側の managed settings の扱いが続く。2.1.278 では
+`"Disable the Workflows feature (also via CLAUDE_CODE_DISABLE_WORKFLOWS)."` だった）
 
-`/config` の "Dynamic workflows" トグルが書き込むのは `enableWorkflows` のほう。`disableWorkflows: true` は
-managed 向けの制限用途に分類されているが、通常の `settings.json` でも引き続き有効。どちらか一方でよい
-（両方書く必要はない）。2.1.278 の API 実測で -2,057 tokens。
+公式 settings-reference（2026-10-10 fetch）の位置づけ: `disableWorkflows` は "Turn dynamic workflows off for everyone;
+use `enableWorkflows` for yourself"、`enableWorkflows` は "Turn dynamic workflows on or off against your plan's default"。
+`disableWorkflows` は非推奨ではなく、managed settings 等で全員に効かせるためのキー。`/config` の "Dynamic workflows"
+トグルが書き込むのは `enableWorkflows` のほうで、自分だけ止めるならこちらを使う。通常の `settings.json` に
+`disableWorkflows: true` を書いてもローカルの Workflow は止まる。どちらか一方でよい（両方書く必要はない）。
+2.1.278 の API 実測で -2,057 tokens。
+
+2.1.285 から、`disableWorkflows` を入れても Code Review の PR レビューと `/ultrareview` は止まらない（CHANGELOG:
+"Changed Code Review's pull request reviews and `/ultrareview` to run when `disableWorkflows` is on, unless the machine
+running the review has it set by its own administrator (MDM or the managed-settings file)"）。
 
 ### `disableBundledSkills`
 
@@ -180,11 +190,16 @@ API 実測は -716 tokens。検証環境ではプロジェクトの auto-memory 
 
 ### `disableClaudeAiConnectors`
 
-describe() 文字列（binary 確認）: `"When true in any settings source, claude.ai MCP cloud connectors are not
-auto-fetched or connected."`
+describe() 文字列（binary 確認・2.1.295）: `"When true in any settings source, claude.ai MCP cloud connectors are not
+auto-fetched or connected, and a claudeai-proxy server passed explicitly (e.g. via --mcp-config or the SDK mcpServers
+option) does not connect either. Any-source-true wins: a project can opt out, but a project-level false cannot override a
+user-level true."`（2.1.278 では最初の文だけだった）
 
 claude.ai 側で接続したコネクタ（MCP）は、ターミナルでも名前と server instructions が常駐する（MCP のスキーマ自体は
-Tool Search で deferred）。使っていないなら `true` で取りに行かなくなる。削減量は未実測（非対話では MCP が載らない）。
+Tool Search で deferred）。使っていないなら `true` で取りに行かなくなる。API での削減量は未実測（非対話では MCP が載らない）。
+対話の `/context` では、2.1.283 から server instructions が "MCP server instructions" の独立した行で出て Total に入る
+（CHANGELOG: "Fixed `/context` not counting MCP server instructions: they now appear as their own row and count toward the
+total"）ので、この行の Before / After で推定できる。
 claude.ai から同期される skill / plugin は別物で、`skillOverrides` で個別に落とす。
 
 ### `autoDreamEnabled` / `autoMemoryDirectory`（削減用途ではない）
@@ -201,10 +216,11 @@ When unset, defaults to ~/.claude/projects/<sanitized-cwd>/memory/."`
 ## 推奨適用パターン
 
 **適用する前に `/context` の Total 行で分母を確認する。** 表の「2.1.278 実測」は絶対量であって、Total に対する割合ではない。
-Anthropic API 直結では現行モデルが 1M 窓を既定で使うので（公式 model-config、2026-09-21 fetch: "On the Anthropic API,
-Fable 5.1, Fable 5, Sonnet 5, and Opus 4.7 and later run with the 1M window by default."）、最大の -3,563 tokens でも
-Total の 0.4%。200k 窓（Pro プランで usage credits を使わない Opus、Bedrock / Vertex / Foundry のピン留め等）では
-同じ量が 1.8% になる。
+現行モデルは 1M 窓が既定なので（公式 model-config、2026-10-10 fetch: "Fable 5.1, Fable 5, Sonnet 5 and later, Haiku 5.5,
+and Opus 4.7 and later run with the 1M window by default, with no `[1m]` suffix needed. That includes sessions on Amazon
+Bedrock, Google Cloud's Agent Platform, and Microsoft Foundry, and Claude apps gateway sessions."）、最大の -3,563 tokens でも
+Total の 0.4%。200k 窓（Opus 4.6 / Sonnet 4.6 を `[1m]` なしで使う、1M 非対応のモデル、`CLAUDE_CODE_DISABLE_1M_CONTEXT=1`
+等）では同じ量が 1.8% になる。Bedrock / Vertex / Foundry は 2.1.287 から既定で 1M。
 
 ### A. まず測る（何も入れない）
 
@@ -220,7 +236,7 @@ SKILL.md Step 1 の判定 3 分岐（200k 窓か / CLAUDE.md が 200 行超か /
 }
 ```
 
--2,057 tokens。必要になったら該当行を削除して再起動で即復活。旧キー `disableWorkflows: true` も同じ効果で引き続き動作する。
+-2,057 tokens。必要になったら該当行を削除して再起動で即復活。`disableWorkflows: true` でもローカルの Workflow は止まるが、こちらは全員に効かせるためのキー（上記）。
 
 ### C. skill が多い人
 
@@ -248,7 +264,8 @@ SKILL.md Step 1 の判定 3 分岐（200k 窓か / CLAUDE.md が 200 行超か /
 settings.json の代わりに環境変数で制御できるものもある:
 
 - `CLAUDE_CODE_DISABLE_ARTIFACT=1` — `enableArtifact: false`（旧 `disableArtifact: true`）と同等
-- `CLAUDE_CODE_DISABLE_WORKFLOWS` — `enableWorkflows: false`（旧 `disableWorkflows: true`）と同等
+- `CLAUDE_CODE_DISABLE_WORKFLOWS` — Claude Code の起動前に環境へ置くと Workflow を止める（`disableWorkflows` の describe():
+  "Set in the environment before Claude Code starts, CLAUDE_CODE_DISABLE_WORKFLOWS disables Workflows."。2.1.295）
 - `CLAUDE_CODE_DISABLE_BUNDLED_SKILLS` — `disableBundledSkills: true` と同等
 - `CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` — `autoMemoryEnabled: false` と同等
 - `SLASH_COMMAND_TOOL_CHAR_BUDGET` — skill listing の文字数上限を直接指定する（文字数）。
@@ -263,7 +280,7 @@ settings.json の代わりに環境変数で制御できるものもある:
 
 ## 注意事項
 
-- 公式 docs は変わる可能性がある。**最新は <https://code.claude.com/docs/en/settings> を参照**
+- 公式 docs は変わる可能性がある。**最新は <https://code.claude.com/docs/en/settings-reference> を参照**
 - このリファレンスは 2026-09-21 時点、Claude Code 2.1.278 で確認したもの。バージョンが上がったら再確認が必要
 - ベータ機能や非公開のキーは記載していない
 - **キー名の再確認**: `settings.json` のキー名は非公開のスキーマ実装に依存するため、公式 docs に載っていない
@@ -275,12 +292,14 @@ settings.json の代わりに環境変数で制御できるものもある:
 ```powershell
 $rg = '<rg.exe のフルパス>'
 $exe = "$env:USERPROFILE\.local\bin\claude.exe"
-& $rg -a -o --no-filename 'skillOverrides:pe\(s\(\),K\(\["on".{0,700}' $exe
-& $rg -a -o --no-filename '(disableWorkflows|disableArtifact|enableArtifact|disableBundledSkills):[^"]{0,80}describe\("[^"]{0,400}"' $exe
+# キー名の直後の describe() を全文拾う。minify 後の変数名に依存せず、引用符が " でも ' でも当たる
+$pat = '(skillOverrides|enableWorkflows|disableWorkflows|enableArtifact|disableArtifact|disableBundledSkills|disableClaudeAiConnectors):.{0,160}?describe\((?:"[^"]{0,1200}"|''[^'']{0,1200}'')\)'
+& $rg -a -o --no-filename $pat $exe | Sort-Object -Unique
+# 存在の判定はキー名そのもので数える
 & $rg -a -o --no-filename 'disabledTools|enabledTools|maxSkillDescriptionChars|skillListingMaxDescChars' $exe | Group-Object | ForEach-Object { "{0} : {1}" -f $_.Name, $_.Count }
 ```
 
-  最短経路は「探しているキー名を含む describe() パターンを rg で当てて、返ってきた説明文をそのまま引用する」こと。0 件なら「存在しない」側、説明文が返れば「実在キー一覧」側に分類できる。
+  最短経路は「探しているキー名を含む describe() パターンを rg で当てて、返ってきた説明文をそのまま引用する」こと。説明文が返れば「実在キー一覧」側に分類できる。**describe() が返らないだけでは「存在しない」側に分類しない。** 2.1.278 時点の再現コマンドは、2.1.295 で minify 後の変数名が変わって `skillOverrides` が 0 件になり、`disableWorkflows` は説明文が 400 文字を超えて取りこぼした（どちらも実在する）。「存在しない」と書くのは、キー名そのもので数えて 0 件だったときだけにする（2 本目のコマンド）。
 
 - **削減量の再確認**: `/context` は推定なので、削減量は API usage で取る。設定断片を JSON ファイルに書き、非対話で
   1 往復させて `usage` の 3 フィールドを合計する（baseline は `--settings` 無し）。応答は 1 つのオブジェクト（`type: result`）で返る:
@@ -301,7 +320,7 @@ $r.usage.input_tokens + $r.usage.cache_creation_input_tokens + $r.usage.cache_re
 
 ## 関連
 
-- 公式 settings docs: <https://code.claude.com/docs/en/settings>
-- 公式 environment variables: <https://code.claude.com/docs/en/environment-variables>
+- 公式 settings docs: <https://code.claude.com/docs/en/settings-reference>（キーごとの定義）/ <https://code.claude.com/docs/en/settings>（設定ファイルの仕組み）
+- 公式 environment variables: <https://code.claude.com/docs/en/env-vars>
 - 公式 costs（context を減らす公式の案内。"Move instructions from CLAUDE.md to skills" 等）: <https://code.claude.com/docs/en/costs>
 - 元記事: [Zenn 記事](https://zenn.dev/ishizakahiroshi/articles/20260622-claude-code-context-diet)（2026-06-22 時点・200k 窓の内容。settings キー名と削減量は本リファレンスの方が新しい）

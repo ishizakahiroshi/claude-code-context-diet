@@ -61,7 +61,7 @@ Memory Files
 
 `/context` は公式の提案行も出す（公式 commands、2026-09-21 fetch: "Shows optimization suggestions for context-heavy tools, memory bloat, and capacity warnings."）。自分で分類する前に、そこに挙がった項目を候補に入れる。
 
-"System tools (deferred)" は Tool Search でスキーマが遅延ロードされるツールで、名前だけが常駐し Total に含まれない。2.1.278 では MCP ツールに加えて WebFetch / WebSearch / NotebookEdit 等の組み込みツールも deferred になる。削減対象にしない。MCP は名前と server instructions だけが常駐する（公式 costs: "MCP tool definitions are deferred by default, so only tool names and server instructions enter context until Claude uses a specific tool."）。
+"System tools (deferred)" は Tool Search でスキーマが遅延ロードされるツールで、名前だけが常駐し Total に含まれない。2.1.278 では MCP ツールに加えて WebFetch / WebSearch / NotebookEdit 等の組み込みツールも deferred になる。削減対象にしない。MCP は名前と server instructions だけが常駐する（公式 costs: "MCP tool definitions are deferred by default, so only tool names and server instructions enter context until Claude uses a specific tool."）。server instructions は 2.1.283 から `/context` に "MCP server instructions" の独立した行で出て、Total に入る（2.1.278 までは数えられておらず、上の内訳例にも無い）。
 
 公式 docs は CLAUDE.md 単体の行数に目安を示している（<https://code.claude.com/docs/en/memory> より、2026-09-21 fetch）: "Size: target under 200 lines per CLAUDE.md file. Longer files consume more context and reduce adherence. If your instructions are growing large, use path-scoped rules so instructions load only when Claude works with matching files. You can also split content into imports for organization, though imported files still load and enter the context window at launch."（1 ファイル 200 行未満を目安にする。長いと context を消費し遵守率も下がる。大きくなったらパス条件付きの rules へ。`@import` に分けても起動時に載るので context は減らない、の意）。
 
@@ -73,9 +73,11 @@ Memory Files
 
 ### 1M 窓が既定になった
 
-公式 model-config（2026-09-21 fetch）: "On the Anthropic API, Fable 5.1, Fable 5, Sonnet 5, and Opus 4.7 and later run with the 1M window by default." / "On the Anthropic API, Sonnet 5 always runs with the 1M context window. There is no 200K variant, no `[1m]` suffix to select, and no usage credits required on any plan." / "On Max, Team, and Enterprise plans, including both Team Standard and Team Premium seats, Opus is automatically upgraded to 1M context with no additional configuration."
+公式 model-config（2026-10-10 fetch）: "Fable 5.1, Fable 5, Sonnet 5 and later, Haiku 5.5, and Opus 4.7 and later run with the 1M window by default, with no `[1m]` suffix needed. That includes sessions on Amazon Bedrock, Google Cloud's Agent Platform, and Microsoft Foundry, and Claude apps gateway sessions." / "Opus 4.6 and Sonnet 4.6 reach 1M only through their `[1m]` variant, and access to that variant depends on your plan."
 
-200k 窓が残るのは、Pro プランで usage credits を使わない Opus と、Bedrock / Vertex / Foundry で `[1m]` を付けずにピン留めしたモデル。1M 窓のセッションは "at about 967K tokens by default" で auto-compact する。**上限が大きい環境ほど、削減の絶対量だけで「効果があった」と判断しない。**
+CHANGELOG では、Bedrock / Vertex / Foundry の既定 1M が 2.1.287（"Changed Opus 4.7+ and Fable to use a 1M context window by default on Bedrock, Vertex, Foundry and the Claude apps gateway, with no `[1m]` suffix (`CLAUDE_CODE_DISABLE_1M_CONTEXT=1` keeps 200K)"）、`ANTHROPIC_BASE_URL` のゲートウェイ経由の 1M が 2.1.285（"run `/autocompact 200k` if your gateway stops at 200K"）。
+
+200k 窓が残るのは、Opus 4.6 / Sonnet 4.6 を `[1m]` なしで使う場合、1M に対応しないモデル（Sonnet 4.5 / Haiku 4.5 等。対応一覧は公式 model-config）、`CLAUDE_CODE_DISABLE_1M_CONTEXT=1` を設定した場合。ゲートウェイが 200K で止める場合は、分母が `1m` と出ても実際の上限は 200K。1M 窓のセッションは "at about 967K tokens by default" で auto-compact する。**上限が大きい環境ほど、削減の絶対量だけで「効果があった」と判断しない。**
 
 ### prompt cache を前提に読む
 
@@ -130,6 +132,12 @@ baseline は `--settings` 無しで同じコマンドを打つ。差が削減量
 4. **展開されない import・連続した空行・移行告知は、読まれていないのに常駐している。** import 行は `/context all` の一覧に出るかで確認し、空行は物理行で数える
 
 監査の結果は「矛盾 N・重複 N 組・陳腐化 N・曖昧 N」と数えて報告する。行数の削減量より、この数が減ったことを成果にする。
+
+**公式の `/doctor prompt-audit` を先に回す（2.1.283 以降）。** 公式 memory（2026-10-10 fetch）: "To have Claude check your instruction files for outdated or conflicting content, run `/doctor prompt-audit` in a session. Claude looks for problems such as instructions written for older models, references to files or commands that don't exist, and files that contradict each other. You get a report of findings with proposed edits, and nothing in your files changes until you ask Claude to apply them."
+
+- 対象は CLAUDE.md・CLAUDE.local.md・AGENTS.md と、`.claude/`・`~/.claude/` 配下の rules・skills・commands・subagents・output styles。1 ファイルだけ見るならパスを渡す（例: `/doctor prompt-audit .claude/skills/deploy`）。別名は `/checkup prompt-audit`
+- 公式の説明に挙がっているのは陳腐化（古いモデル向けの書き方・存在しない参照）と矛盾。重複と曖昧は挙がっていないので、上の表で見る
+- 同梱の `/claude-api` skill を通して動く（"It's unavailable while that skill is turned off in `skillOverrides` or with `disableBundledSkills`."）。Step 4 で bundled skill を切る前に回しておく
 
 `~/.claude/CLAUDE.md` を全部読み、章ごとに分類する。公式の第一選択は skills と `.claude/rules/`。`@import` に分けても context は減らない（公式 memory、2026-09-21 fetch: "Splitting into `@path` imports helps organization but doesn't reduce context, since imported files load at launch."）。
 
@@ -263,7 +271,7 @@ find $roots -name '*.jsonl' -mtime -60 -print0 \
 
 読み方と対処:
 
-- 0 回の skill → `skillOverrides` で `off`。自分で書いた skill は `name-only`（説明文だけ落とし、名前では呼べる）。claude.ai から同期される `anthropic-skills:*` と plugin の skill も `/context all` の Skills 表に出るので同じ基準で見る。plugin は skill 単位で切れないので `claude plugin disable <name>`
+- 0 回の skill → `skillOverrides` で `off`。自分で書いた skill は `name-only`（説明文だけ落とし、名前では呼べる）。claude.ai から同期される skill と plugin の skill も `/context all` の Skills 表に出るので同じ基準で見る。同期 skill は 2.1.281 から、他のコマンドと名前がぶつからなければ短い名前で表示される（"show skills synced from claude.ai by their short name when no other command uses it, not `anthropic-skills:<name>`"）。`anthropic-skills:` の接頭辞では探せないので、自分で入れた覚えの無い名前を拾う。plugin は skill 単位で切れないので `claude plugin disable <name>`。bundled の `claude-api` は使用実績 0 回でも、`off` にすると `/doctor prompt-audit`（Step 2）が使えなくなる
 - 0 回のツール群 → Artifact なら `enableArtifact: false`、claude.ai の MCP コネクタ（`mcp__claude_ai_*`）なら `disableClaudeAiConnectors: true`
 - auto-memory のディレクトリ（`<config dir>/projects/*/memory/`）にファイルが無い → `autoMemoryEnabled: false`
 - **どの settings.json が読まれているかを先に確かめる。** `echo $CLAUDE_CONFIG_DIR`（PowerShell: `$env:CLAUDE_CONFIG_DIR`）が設定されていれば `~/.claude/settings.json` は読まれない。作者環境では many-ai-cli のプロファイルが別の settings.json を持ち、既定側で入れた `disableArtifact: true` と `disableClaudeAiConnectors: true` が効いていなかった
@@ -297,7 +305,7 @@ find $roots -name '*.jsonl' -mtime -60 -print0 \
 }
 ```
 
-旧キー `disableArtifact: true` / `disableWorkflows: true` も引き続き動作するが、新規に書くときは `enableArtifact` / `enableWorkflows` を使う。完全な公式キー一覧と測定条件は [settings-keys-reference.md](settings-keys-reference.md) 参照。
+旧キー `disableArtifact: true` は非推奨だが引き続き動作する。新規に書くときは `enableArtifact` を使う。`disableWorkflows: true` は非推奨ではなく、managed settings 等で全員の Workflow を止めるためのキー（自分だけなら `enableWorkflows`。2.1.285 から Code Review と `/ultrareview` は止めない）。完全な公式キー一覧と測定条件は [settings-keys-reference.md](settings-keys-reference.md) 参照。
 
 `enableArtifact: false` は安全だが非対話では測れないので、対話セッションで `/context` の Before / After（推定値）を取ってから入れる。
 
@@ -342,7 +350,7 @@ Before/After 比較表を作る。`/context` の値は推定なので「推定�
 ## Step 6: しばらく様子見
 
 - 2 週間ほど運用して挙動に問題なければバックアップ削除
-- Workflow / ultracode / deep-research が必要になったら `enableWorkflows: false`（旧 `disableWorkflows: true` も可）の行を削除する
+- Workflow / ultracode / deep-research が必要になったら `enableWorkflows: false`（`disableWorkflows: true` で止めた場合はその行）を削除する
 - トリガー判定漏れの事故があれば、該当トリガー文を grep 可能な明示語彙に書き直す
 
 ## トラブルシュート
@@ -353,7 +361,7 @@ Before/After 比較表を作る。`/context` の値は推定なので「推定�
 
 ### 「context が思ったほど減らない」
 
-→ 1M 窓では減っても Total 比が小さい（settings キーの最大で 0.4%）。目的を遵守率に置き直し、CLAUDE.md の行数と skill の起動で評価する。Memory が元々スリムなら、System tools 側で `enableWorkflows: false`（旧 `disableWorkflows: true` も可）を試す。
+→ 1M 窓では減っても Total 比が小さい（settings キーの最大で 0.4%）。目的を遵守率に置き直し、CLAUDE.md の行数と skill の起動で評価する。Memory が元々スリムなら、System tools 側で `enableWorkflows: false` を試す。
 
 ### 「`disableBundledSkills: true` を入れたら増えた」
 
@@ -365,7 +373,7 @@ Before/After 比較表を作る。`/context` の値は推定なので「推定�
 
 ### 「`enableWorkflows: false` 入れたら ultracode が動かない」
 
-→ 想定通り。`settings.json` の `"enableWorkflows": false`（または旧キー `"disableWorkflows": true`）の行を削除して再起動。
+→ 想定通り。`settings.json` の `"enableWorkflows": false`（または `"disableWorkflows": true`）の行を削除して再起動。
 
 ### 「`/context` の数値が変わらない」
 
