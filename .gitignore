@@ -62,7 +62,7 @@ secrets.*
 .pypirc
 
 # === secrets-scan exception ===
-!scripts/secrets-scan.mjs
+!scripts/secrets-scan.*.mjs
 # === obsidian-link: managed ===
 /docs/obsidian/
 # === /obsidian-link: managed ===
