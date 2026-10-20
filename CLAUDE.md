@@ -61,7 +61,7 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
 - `skills/context-diet/references/claude-md-split-pattern.md` — CLAUDE.md の章を skill / rules / トリガー文へ移す具体パターン
 - `.claude-plugin/plugin.json` — plugin manifest（`skills/` は自動検出なので列挙しない）
 - `.claude-plugin/marketplace.json` — marketplace manifest（このリポ自身を `"./"` として配る）
-- `scripts/` — secrets-scan と hook インストーラ
+- `scripts/` — doxguard 実行アダプタ（secrets-scan.dual / staged）と hook インストーラ
 - `.githooks/` — layer 2 pre-commit
 - `.github/workflows/` — layer 3 CI
 
@@ -69,7 +69,7 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
 
 ビルドもテストもない。編集して push するだけ。
 
-- secrets-scan 手動実行: `node scripts/secrets-scan.mjs --staged --block`
+- secrets-scan 手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`（doxguard）
 - manifest 検証: `claude plugin validate .`（marketplace 側）/ `claude plugin validate .claude-plugin/plugin.json`（plugin 側）。CI 相当の厳しさで見るときは `--strict`
 - ローカル起動テスト: `claude --plugin-dir .`（この状態のリポを plugin として読み込んだセッションが立つ）
 - 削減量の実測: `claude -p "Reply with exactly: OK" --output-format json --settings <json>` の `usage`（`input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens`）。`/context` は推定で、同条件の API 実測と 14.6k tokens ずれた（2.1.278）
@@ -99,10 +99,10 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
 
 書く瞬間の責務（固有名詞の一般化・fixture は合成データ等）は上記「AI 作業共通ルール」の参照先に従う。このリポジトリ固有の配線は以下:
 
-- scanner: `scripts/secrets-scan.mjs`（手動実行: `node scripts/secrets-scan.mjs --staged --block`）
-- layer 2: `.githooks/pre-commit`（`core.hooksPath = .githooks` で有効化済み。第三者 clone 時は `bash scripts/install-hooks.sh` または `pwsh scripts/install-hooks.ps1`）
+- scanner: doxguard（手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`。CI は gitleaks も併用）
+- layer 2: `.githooks/pre-commit`（doxguard opt-in。`core.hooksPath = .githooks` で有効化済み。第三者 clone 時は `bash scripts/install-hooks.sh` または `pwsh scripts/install-hooks.ps1`）
 - layer 3: `.github/workflows/secrets-scan.yml`
-- env（full coverage に必要・未設定なら構造 regex のみで継続）: `KB_ROOT` / `FAMILY_ROOT`
+- env（full coverage に必要・未設定なら構造 regex のみで継続）: `DOXGUARD_CONFIG`（private watchlist への参照）
 
 **このリポは context 削減の実例として `settings.json` や `CLAUDE.md` の断片を載せる。**
 作者環境の実物をそのまま貼ると個人パスや固有名詞が混ざるので、掲載前に必ず
