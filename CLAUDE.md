@@ -69,14 +69,14 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
 
 ビルドもテストもない。編集して push するだけ。
 
-- secrets-scan 手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`（doxguard）
+- secrets-scan 手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`（doxguard）。**CI 用**: Linux x64 で doxguard 0.2.0 を `node_modules` に入れた状態が前提（スクリプトが Linux 用の実体を必須にしている）。Windows の手元では exit 1 で失敗する（2026-11-12 確認）。手元の検査は pre-commit が担う
 - manifest 検証: `claude plugin validate .`（marketplace 側）/ `claude plugin validate .claude-plugin/plugin.json`（plugin 側）。CI 相当の厳しさで見るときは `--strict`
 - ローカル起動テスト: `claude --plugin-dir .`（この状態のリポを plugin として読み込んだセッションが立つ）
 - 削減量の実測: `claude -p "Reply with exactly: OK" --output-format json --settings <json>` の `usage`（`input_tokens` + `cache_creation_input_tokens` + `cache_read_input_tokens`）。`/context` は推定で、同条件の API 実測と 14.6k tokens ずれた（2.1.278）
 
 ## AI 作業共通ルール
 
-ビルド・コミット禁止、secrets-scan 責務、plan/bugfix/pending md の作成ルール等の AI 作業共通ルールは、各利用者のグローバル AI 設定に従う（作者環境の例: `~/.claude/CLAUDE.md` および `~/.claude/guides/`）。
+ビルド・コミットの可否、secrets-scan 責務、plan/bugfix/pending md の作成ルール等の AI 作業共通ルールは、各利用者のグローバル AI 設定に従う（作者環境の例: `~/.claude/CLAUDE.md` および `~/.claude/guides/`）。
 
 このリポジトリ固有:
 
@@ -86,11 +86,11 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
   セットで書く。** 版が上がって実在するようになったら、その時点で訂正が要る。2026-06-22 版は
   `skillOverrides` を「存在しない」と書いていたが、2.1.263 の実行ファイル走査で実在が確認され
   訂正した（このリポ自身が踏んだ例）
-- `SKILL.md` を変更したら README の説明表も同時に直す（起動語と用途が 2 箇所にある）。
-  あわせて `.claude-plugin/plugin.json` の `version` を上げる（上げないと利用者へ更新が届かない）
-- **数字はどちらで測ったかを併記する。** `/context` の値は推定、API usage が実測。2.1.278 では同条件で
-  14.6k tokens ずれ、カテゴリ配分も一致しなかった（`skillListingMaxDescChars: 256` で推定は Total 不変、
-  API は -2,277）
+- `SKILL.md` を変更したときの README の同時更新と `plugin.json` の `version` は、上の
+  「`skills/context-diet/SKILL.md` について」の節のとおり（起動語と用途は README と SKILL.md の 2 箇所にある）
+- **数字はどちらで測ったかを併記する。** `/context` の値は推定、API usage が実測（ずれの実測値は
+  「主要コマンド」の節）。2.1.278 ではカテゴリ配分も一致しなかった（`skillListingMaxDescChars: 256` で
+  推定は Total 不変、API は -2,277）
 - **削減キーが逆に増やす例がある。** 2.1.278 で `disableBundledSkills: true` は単独で +4,679 tokens だった。
   キーを勧める前に必ず実測する。非対話（`-p`）には Artifact / AskUserQuestion / MCP が載らないので、それらの
   効果は対話セッションで取る
@@ -99,8 +99,8 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
 
 書く瞬間の責務（固有名詞の一般化・fixture は合成データ等）は上記「AI 作業共通ルール」の参照先に従う。このリポジトリ固有の配線は以下:
 
-- scanner: doxguard（手動実行: `node scripts/secrets-scan.dual.mjs --native-only --staged`。CI は gitleaks も併用）
-- layer 2: `.githooks/pre-commit`（doxguard opt-in。`core.hooksPath = .githooks` で有効化済み。第三者 clone 時は `bash scripts/install-hooks.sh` または `pwsh scripts/install-hooks.ps1`）
+- scanner: doxguard（実行コマンドと前提は「主要コマンド」の節。CI は gitleaks も併用）
+- layer 2: `.githooks/pre-commit`（doxguard opt-in。`core.hooksPath = .githooks` で有効になる。第三者 clone 時は `bash scripts/install-hooks.sh` または `pwsh scripts/install-hooks.ps1`）。**実際にどの hook が動くかは `git config core.hooksPath` で確かめる。** 作者環境は doxguard の試用中で、`core.hooksPath` が `.git/doxguard/` 配下の試用 hook を指し、その後ろで `.githooks/pre-commit` の写しが動く。この間は `.githooks/pre-commit` を直しても写しには反映されない（2026-11-12 確認）
 - layer 3: `.github/workflows/secrets-scan.yml`
 - env（full coverage に必要・未設定なら構造 regex のみで継続）: `DOXGUARD_CONFIG`（private watchlist への参照）
 
