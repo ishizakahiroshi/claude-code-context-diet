@@ -113,16 +113,17 @@ baseline は `--settings` 無しで同じコマンドを打つ。差が削減量
 
 まず各ファイルの行数を測る（bash: `wc -l ~/.claude/CLAUDE.md` / PowerShell: `(Get-Content ~/.claude/CLAUDE.md).Count`。`Measure-Object -Line` は空行を数えないので使わない）。空行を含む物理行で数え、200 行超かどうかは測ってから判定し、推測しない。連続した空行も削減候補に入れる。
 
-### 内容の監査（4 観点・分類の前に）
+### 内容の監査（5 観点・分類の前に）
 
-行数を減らす前に、書いてある内容を 4 観点で監査する。CLAUDE.md 本体だけでなく、`@import` 先・auto-memory の索引と topic ファイル・ツールが注入するファイル（hub / plugin / hook が書き込む承認ルールや guidance）まで同じ表で見る。作者環境では 390 行 → 206 行に減らした後に監査して、矛盾 4・重複 8 組・陳腐化 7・曖昧 5 が残っていた（2026-09-21）。
+行数を減らす前に、書いてある内容を 5 観点で監査する。CLAUDE.md 本体だけでなく、`@import` 先・auto-memory の索引と topic ファイル・ツールが注入するファイル（hub / plugin / hook が書き込む承認ルールや guidance）まで同じ表で見る。作者環境では 390 行 → 206 行に減らした後に監査して、矛盾 4・重複 8 組・陳腐化 7・曖昧 5 が残っていた（2026-09-21）。
 
 | 観点 | 例 | 直し方 |
 |---|---|---|
 | 矛盾 | CLAUDE.md は「行頭の `- ` を使わない」、注入ファイルは「箇条書き（`- `）で書く」 | 正典を 1 つ決めて他を合わせる。注入ファイルは生成元（テンプレート・ソース）を直す |
 | 重複 | 同じ規則が CLAUDE.md の節・memory の索引行・guide の本文の 3 か所にある | 本文は 1 か所に置き、CLAUDE.md は要約 3〜5 行、memory の索引行は消す |
-| 陳腐化 | 「skill 一覧は per-turn で絞られるので当てにしない」（旧版の挙動を根拠にした理由）・「〜は slash command へ移行済」（告知） | 版を併記して書き直すか消す |
+| 陳腐化 | 「skill 一覧は per-turn で絞られるので当てにしない」（旧版の挙動を根拠にした理由）・「〜は slash command へ移行済」（告知）・「◯日までは CI を待たず、手元の検査で代える」（期日を過ぎても残る）・表の 1 つのセルに「前提にしない」と「できた」が日付違いで並ぶ（追記が積もる） | 版を併記して書き直すか消す。期日つきの決まりは、期日のあとの実態を確かめてから書き直す。追記が積もった行は、今の結論だけを残して実績は別の文書へ移す |
 | 曖昧 | 「`MEMORY.md` は索引に保つ」（グローバルの索引かプロジェクト auto-memory かが不明）・節ごとに言語が違う | 指す先を限定する。1 ファイル 1 言語にする |
+| 参照切れ | 「該当時は `~/.claude/guides/<name>.md` を必ず Read」と書いてあるのに、別のホームで起動したセッションではそのファイルが無い | `~/.claude` がどこを指すかを 1 行で書くか、絶対パスにする |
 
 原則:
 
@@ -130,13 +131,23 @@ baseline は `--settings` 無しで同じコマンドを打つ。差が削減量
 2. **ツールが生成するファイルは生成元で直す。** 手で直した分は次の再生成で消える。生成元を直せないなら、その旨を CLAUDE.md 側に 1 行書いて矛盾を明示する
 3. **harness の挙動を根拠にした理由は版で古くなる。** 「〜が通知されない」「〜は存在しない」は確認した Claude Code の版を併記し、版が上がったら再確認する
 4. **展開されない import・連続した空行・移行告知は、読まれていないのに常駐している。** import 行は `/context all` の一覧に出るかで確認し、空行は物理行で数える
+5. **名指しした参照は、実際に使う起動のしかたで開けるかを確かめる。** パス・skill・コマンドの実在を全数見る（PowerShell: `Test-Path` / bash: `test -e`）。`~` は起動のしかたで指す先が変わる。ラッパー経由・`CLAUDE_CONFIG_DIR`・ホームを差し替える起動を使っているなら、ふだんのホームと両方で確かめる。直すときに `~/.claude/` を一括置換しない（リンクの先が別の場所にあるものが切れる）
+6. **指摘は、直す前に反証する。** 指摘ごとに実ファイルを開き直し、(a) 引用が実在するか、(b) 実際に困ることが起きるか、(c) 前に決めた形どおりではないか、を確かめる。確かめられない指摘は直さない。監査した本人とは別の目（別のセッションやサブエージェント）で行うと、思い込みが外れやすい
 
-監査の結果は「矛盾 N・重複 N 組・陳腐化 N・曖昧 N」と数えて報告する。行数の削減量より、この数が減ったことを成果にする。
+監査の結果は「矛盾 N・重複 N 組・陳腐化 N・曖昧 N・参照切れ N」と数えて報告する。行数の削減量より、この数が減ったことを成果にする。
+
+作者環境の 2026-11-12（Claude Code 2.1.316）の監査の記録:
+
+- 対象は常駐している 9 ファイル・829 行。5 観点を別々に調べ、指摘は 54 件。反証で 12 件（約 2 割）が落ちた。落ちた理由は「引用は実在するが困ることが起きない」と「前に決めた形どおりだった」の 2 つ
+- 残った指摘は、1 か月前（2026-10-10）の監査のあとに足した節と表に集まっていた。**前回の監査のあとの追加分から先に見る**
+- 参照切れ: 絶対パス 93 件のうち実在しないものは 4 件。一方、ホームを差し替えて起動するセッションでは、`~/.claude/guides/` で名指ししたガイド 19 本がすべて開けなかった。ふだんのホームでは全部開けるので、ふだんの起動だけで確かめると見つからない
+- 陳腐化: 「◯日までは CI の結果を待たず、手元の検査で代える」が期日を 11 日過ぎて残り、実際には動いている CI の結果を見ない指示になっていた
+- 直したあと、グローバルの CLAUDE.md は 14,151 字から 15,145 字に増えた。監査の成果は量ではなく、上の件数で見る
 
 **公式の `/doctor prompt-audit` を先に回す（2.1.283 以降）。** 公式 memory（2026-10-10 fetch）: "To have Claude check your instruction files for outdated or conflicting content, run `/doctor prompt-audit` in a session. Claude looks for problems such as instructions written for older models, references to files or commands that don't exist, and files that contradict each other. You get a report of findings with proposed edits, and nothing in your files changes until you ask Claude to apply them."
 
 - 対象は CLAUDE.md・CLAUDE.local.md・AGENTS.md と、`.claude/`・`~/.claude/` 配下の rules・skills・commands・subagents・output styles。1 ファイルだけ見るならパスを渡す（例: `/doctor prompt-audit .claude/skills/deploy`）。別名は `/checkup prompt-audit`
-- 公式の説明に挙がっているのは陳腐化（古いモデル向けの書き方・存在しない参照）と矛盾。重複と曖昧は挙がっていないので、上の表で見る
+- 公式の説明に挙がっているのは陳腐化（古いモデル向けの書き方・存在しない参照）と矛盾。重複と曖昧は挙がっていないので、上の表で見る。存在しない参照は公式も見るが、起動のしかたでホームが変わる場合を拾うかは確かめていないので、原則 5 で見る
 - 同梱の `/claude-api` skill を通して動く（"It's unavailable while that skill is turned off in `skillOverrides` or with `disableBundledSkills`."）。Step 4 で bundled skill を切る前に回しておく
 
 `~/.claude/CLAUDE.md` を全部読み、章ごとに分類する。公式の第一選択は skills と `.claude/rules/`。`@import` に分けても context は減らない（公式 memory、2026-09-21 fetch: "Splitting into `@path` imports helps organization but doesn't reduce context, since imported files load at launch."）。

@@ -1,11 +1,11 @@
 ---
 name: context-diet
-description: Claude Code の常駐 context を棚卸しし、削る価値を判定してから減らす手順。内容の監査（矛盾・重複・陳腐化・曖昧）を含む。「コンテキスト棚卸して」「context 確認」「常駐減らしたい」「/context 見て無駄ないか」「memory ファイル分割したい」「CLAUDE.md を skill に移したい」「CLAUDE.md の矛盾を洗って」「重複ルールを整理して」「disabledTools」「settings.json の context」等で起動。
+description: Claude Code の常駐 context を棚卸しし、削る価値を判定してから減らす手順。内容の監査（矛盾・重複・陳腐化・曖昧・参照切れ）を含む。「コンテキスト棚卸して」「context 確認」「常駐減らしたい」「/context 見て無駄ないか」「memory ファイル分割したい」「CLAUDE.md を skill に移したい」「CLAUDE.md の矛盾を洗って」「重複ルールを整理して」「disabledTools」「settings.json の context」等で起動。
 ---
 
 # context-diet スキル
 
-Claude Code セッションの常駐 context を実測し、削る価値を判定してから、指示の遵守率と prompt cache が外れたときの再処理量を減らす。トークン量は判定材料でありゴールではない。`/context` で内訳と分母を見て、Memory files / Skills / System tools を必要なときだけスリム化する。減らす前に、常駐している指示の内容を 4 観点（矛盾・重複・陳腐化・曖昧）で監査する。
+Claude Code セッションの常駐 context を実測し、削る価値を判定してから、指示の遵守率と prompt cache が外れたときの再処理量を減らす。トークン量は判定材料でありゴールではない。`/context` で内訳と分母を見て、Memory files / Skills / System tools を必要なときだけスリム化する。減らす前に、常駐している指示の内容を 5 観点（矛盾・重複・陳腐化・曖昧・参照切れ）で監査する。
 
 ## 起動条件
 
@@ -40,18 +40,21 @@ Claude Code セッションの常駐 context を実測し、削る価値を判�
 
 まず `~/.claude/CLAUDE.md` と @import 各ファイルの行数を測る（bash: `wc -l` / PowerShell: `(Get-Content <file>).Count`。`Measure-Object -Line` は空行を数えないので使わない）。空行を含む物理行で数え、連続した空行も削減候補に入れる。200 行超かどうかは測ってから言い、読み込まれた本文の印象で推測しない。`~/.claude` 配下はプロジェクト外なので Read には許可プロンプトが出る（非対話モードでは拒否される）。
 
-**分類の前に、内容を 4 観点で監査する。** 行数とトークンを減らしても、矛盾した指示や陳腐化した根拠はそのまま残る（作者環境の 2026-09-21: 390 行 → 206 行に減らした後の監査で、矛盾 4・重複 8 組・陳腐化 7・曖昧 5 が残っていた）。対象は CLAUDE.md 本体・`@import` 先・auto-memory の索引と topic ファイル・ツールが注入するファイル（hub / plugin / hook が書き込むもの）。
+**分類の前に、内容を 5 観点で監査する。** 行数とトークンを減らしても、矛盾した指示や陳腐化した根拠はそのまま残る（作者環境の 2026-09-21: 390 行 → 206 行に減らした後の監査で、矛盾 4・重複 8 組・陳腐化 7・曖昧 5 が残っていた）。対象は CLAUDE.md 本体・`@import` 先・auto-memory の索引と topic ファイル・ツールが注入するファイル（hub / plugin / hook が書き込むもの）。
 
 | 観点 | 見つけ方 | 直し方 |
 |---|---|---|
 | 矛盾 | 同じ場面（出力書式・シェル選択・命名）への指示をファイル間で突き合わせる | 正典を 1 つ決め、他は「正典は X」の 1 行にする。ツールが生成するファイルは生成元のテンプレートを直す（手で直した分は次の再生成で消える） |
 | 重複 | 同じ規則が CLAUDE.md の節・memory の索引行・guide の本文に二重三重にある | 本文は 1 か所（skill / guide / rules）。CLAUDE.md は 3〜5 行の要約、memory の索引行は消す |
-| 陳腐化 | harness の挙動を根拠にした理由（「一覧は per-turn で絞られる」）・移行済みの告知・動いていない「最終更新」 | 版を併記して書き直すか、根拠ごと消す |
+| 陳腐化 | harness の挙動を根拠にした理由（「一覧は per-turn で絞られる」）・移行済みの告知・動いていない「最終更新」・期日を過ぎた決まり（「◯日までは〜で代える」）・1 か所に追記が積もって古い結論と新しい実測が並ぶ行 | 版を併記して書き直すか、根拠ごと消す。期日つきの決まりは、期日のあとの実態を確かめて書き直す |
 | 曖昧 | 同じ語が別物を指す（2 種類の `MEMORY.md`）・節ごとに言語が違う・例示が本文と違う書式 | 指す先を 1 語で限定し、例示を本文の書式に揃える |
+| 参照切れ | 指示が名指しするパス・skill・コマンドの実在を全数確かめる（PowerShell: `Test-Path` / bash: `test -e`）。`~` で書いた参照は、ふだんのホームと、実際に使う起動のしかた（ラッパー・`CLAUDE_CONFIG_DIR`・別のホーム）の両方で確かめる | `~` がどこを指すかを 1 行で書くか、絶対パスにする。一括置換はしない（リンクの先が別の場所にあるものが切れる） |
 
-詳細と原則 4 つは [playbook.md](references/playbook.md) Step 2。監査の成果は「矛盾 N・重複 N 組・陳腐化 N・曖昧 N」で数え、行数より先に報告する。
+詳細と原則 6 つは [playbook.md](references/playbook.md) Step 2。監査の成果は「矛盾 N・重複 N 組・陳腐化 N・曖昧 N・参照切れ N」で数え、行数より先に報告する。
 
-Claude Code 2.1.283 以降なら、表で見る前に公式の `/doctor prompt-audit`（別名 `/checkup prompt-audit`）をユーザーに実行してもらう。対象は CLAUDE.md・CLAUDE.local.md・AGENTS.md と、`.claude/`・`~/.claude/` 配下の rules・skills・commands・subagents・output styles。古いモデル向けの書き方・存在しないファイルやコマンドへの参照・ファイル間の矛盾を修正案つきで報告し、頼むまでファイルは変えない（公式 memory、2026-10-10 fetch）。公式の説明に重複と曖昧は挙がっていないので、その 2 観点は上の表で見る。同梱の `/claude-api` skill を通して動くため、`skillOverrides` で `claude-api` を `off` にしているか `disableBundledSkills` を入れていると使えない。
+**指摘は、直す前に反証する。** 指摘ごとに実ファイルを開き直し、引用が実在するか、実際に困ることが起きるか、前に決めた形どおりではないかを確かめる（作者環境の 2026-11-12: 54 件のうち 12 件が反証で落ちた）。**前回の監査のあとに足した節と表から先に見る**（同日の監査では、残った指摘が 1 か月前の監査のあとの追加分に集まっていた）。
+
+Claude Code 2.1.283 以降なら、表で見る前に公式の `/doctor prompt-audit`（別名 `/checkup prompt-audit`）をユーザーに実行してもらう。対象は CLAUDE.md・CLAUDE.local.md・AGENTS.md と、`.claude/`・`~/.claude/` 配下の rules・skills・commands・subagents・output styles。古いモデル向けの書き方・存在しないファイルやコマンドへの参照・ファイル間の矛盾を修正案つきで報告し、頼むまでファイルは変えない（公式 memory、2026-10-10 fetch）。公式の説明に重複と曖昧は挙がっていないので、その 2 観点は上の表で見る。参照切れのうち、起動のしかたでホームが変わる場合を拾うかは確かめていないので、これも上の表で見る。同梱の `/claude-api` skill を通して動くため、`skillOverrides` で `claude-api` を `off` にしているか `disableBundledSkills` を入れていると使えない。
 
 `~/.claude/CLAUDE.md` と参照されている @import 群を Read し、章ごとに 4 分類する。公式の第一選択は skills と `.claude/rules/` で、`@import` に分けても context は減らない（公式 memory、2026-09-21 fetch: "Splitting into `@path` imports helps organization but doesn't reduce context, since imported files load at launch."）。
 
@@ -131,7 +134,8 @@ CLAUDE.md / settings.json を編集する **前に必ずバックアップ**（`
 - `disableBundledSkills: true` を削減目的で勧めない（2.1.278 の API 実測で単独 +4,679 tokens）
 - `/context` の推定値だけで Before / After を語らない（同条件の API 実測と 14.6k tokens ずれた）
 - 全部を skill にして listing を肥大させない（`description` は常駐する。listing 全体は `skillListingBudgetFraction` 既定 1% の予算内で自動短縮される）
-- 行数とトークンだけ見て内容の監査を飛ばさない（矛盾・重複・陳腐化・曖昧は行数を減らしても残る。ツールが注入するファイルは生成元で直す）
+- 行数とトークンだけ見て内容の監査を飛ばさない（矛盾・重複・陳腐化・曖昧・参照切れは行数を減らしても残る。ツールが注入するファイルは生成元で直す）
+- 監査の指摘を、反証せずにそのまま直さない（前に決めたことを蒸し返す。作者環境では約 2 割が反証で落ちた）
 - 使用実績 0 回を理由に bundled の `claude-api` を `off` にするときは、`/doctor prompt-audit` が使えなくなることを黙って省かない
 
 ## 関連

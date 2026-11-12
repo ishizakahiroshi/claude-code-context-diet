@@ -8,10 +8,12 @@ Claude Code の常駐 context を実測ベースで棚卸しし、削る価値�
 
 2026-10-10 に Claude Code 2.1.295 の CHANGELOG・公式 docs と照合し、変わった記述（200k 窓が残る条件・`/context` の MCP 行・`disableWorkflows` の扱い等）を直して、公式の `/doctor prompt-audit` を手順に入れました（plugin 1.2.0）。削減量の実測値は 2.1.278 のままです。
 
+2026-11-12 に作者環境の常駐指示（9 ファイル・829 行）を監査し直し、その結果を手順に入れました（plugin 1.3.0）。観点に「参照切れ」を足して 5 観点にし、指摘は直す前に反証する手順を足しています（54 件のうち 12 件が反証で落ちました）。
+
 ## まず判断すること
 
 1. `/context` の Total 行の分母を見る。1M 窓ならトークン目的では削らず、目的を遵守率と cache miss 時の再処理量に置く
-2. 行数を減らす前に、内容を 4 観点（矛盾・重複・陳腐化・曖昧）で監査する。CLAUDE.md・`@import`・memory・ツールが注入するファイルの間の矛盾は、トークンを減らしても残る。Claude Code 2.1.283 以降は公式の `/doctor prompt-audit` を先に回す（陳腐化と矛盾を修正案つきで出す。重複と曖昧は 4 観点の表で見る）
+2. 行数を減らす前に、内容を 5 観点（矛盾・重複・陳腐化・曖昧・参照切れ）で監査する。CLAUDE.md・`@import`・memory・ツールが注入するファイルの間の矛盾は、トークンを減らしても残る。Claude Code 2.1.283 以降は公式の `/doctor prompt-audit` を先に回す（陳腐化と矛盾を修正案つきで出す。重複・曖昧と、起動のしかたで変わる参照切れは 5 観点の表で見る）。指摘は、直す前に実ファイルを開き直して反証する
 3. CLAUDE.md が 1 ファイル 200 行を超えていれば、公式の目安どおり skills / `.claude/rules/` へ移す（`@import` に分けても context は減らない）
 4. `settings.json` のキーは最後。`disableBundledSkills: true` は単独で常駐が増える（2.1.278 実測 +4,679 tokens）ので入れない
 5. Skills と System tools は使用実績で切る。`/skill-doctor` だけで判断せず、transcript の tool_use を 60 日ぶん数える。設定はどの settings.json が読まれているか（`CLAUDE_CONFIG_DIR`）を先に確かめる
@@ -20,8 +22,8 @@ Claude Code の常駐 context を実測ベースで棚卸しし、削る価値�
 
 | ファイル | 用途 |
 |---|---|
-| [`skills/context-diet/SKILL.md`](skills/context-diet/SKILL.md) | スキル本体。AI に「コンテキスト棚卸して」と頼むと走る。削る価値の判定（3 分岐）→ 内容の監査（4 観点）→ 4 分類 → settings キーの順 |
-| [`skills/context-diet/references/playbook.md`](skills/context-diet/references/playbook.md) | 詳細手順。判定 3 分岐、内容の監査の 4 観点と原則、skill の作り方、API usage で削減量を実測する 1 行コマンド |
+| [`skills/context-diet/SKILL.md`](skills/context-diet/SKILL.md) | スキル本体。AI に「コンテキスト棚卸して」と頼むと走る。削る価値の判定（3 分岐）→ 内容の監査（5 観点）→ 4 分類 → settings キーの順 |
+| [`skills/context-diet/references/playbook.md`](skills/context-diet/references/playbook.md) | 詳細手順。判定 3 分岐、内容の監査の 5 観点と原則（指摘の反証を含む）、skill の作り方、API usage で削減量を実測する 1 行コマンド |
 | [`skills/context-diet/references/settings-keys-reference.md`](skills/context-diet/references/settings-keys-reference.md) | Claude Code `settings.json` で実在する context 削減キーの一覧と 2.1.278 の API 実測。`disabledTools` は存在しない（Claude Code 2.1.278 で確認）という事実つき |
 | [`skills/context-diet/references/claude-md-split-pattern.md`](skills/context-diet/references/claude-md-split-pattern.md) | CLAUDE.md の章を skill / rules / トリガー文へ移す具体パターン |
 | [`.claude-plugin/`](.claude-plugin) | plugin / marketplace の manifest。`/plugin` で導入するときに使われる |

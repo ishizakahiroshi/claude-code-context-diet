@@ -56,7 +56,7 @@ settings キーの最大でも -3,563 tokens。測定条件は `skills/context-d
 
 - `skills/context-diet/SKILL.md` — 配布用スキル本体（plugin として自動検出される。手動なら
   ディレクトリごと `~/.claude/skills/context-diet/` へ置く）
-- `skills/context-diet/references/playbook.md` — 詳細手順（判定 3 分岐・内容の監査 4 観点・skill の作り方・使用実績の数え方・API usage での実測法）
+- `skills/context-diet/references/playbook.md` — 詳細手順（判定 3 分岐・内容の監査 5 観点と指摘の反証・skill の作り方・使用実績の数え方・API usage での実測法）
 - `skills/context-diet/references/settings-keys-reference.md` — `settings.json` で実在する context 削減キーの一覧と 2.1.278 の API 実測
 - `skills/context-diet/references/claude-md-split-pattern.md` — CLAUDE.md の章を skill / rules / トリガー文へ移す具体パターン
 - `.claude-plugin/plugin.json` — plugin manifest（`skills/` は自動検出なので列挙しない）
